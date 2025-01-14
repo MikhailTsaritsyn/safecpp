@@ -16,10 +16,10 @@ message(STATUS "Googletest support (source)")
 enable_testing()
 
 add_executable(safecpp_test
-        test/example.cpp
+        test/BorrowChecker.cpp
 )
 
-target_include_directories(safecpp_test PRIVATE test)
+target_include_directories(safecpp_test PRIVATE test ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(safecpp_test PRIVATE gtest_main)
 include(GoogleTest)
 gtest_discover_tests(safecpp_test)

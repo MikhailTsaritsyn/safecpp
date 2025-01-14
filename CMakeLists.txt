@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 23)
 add_executable(safecpp
         main.cpp
 )
+target_include_directories(safecpp PUBLIC include)
 
 # Compiler static analysis flags
 target_compile_options(safecpp PRIVATE -Wall -Wextra -Wshadow -Wconversion -Wpedantic -Werror)
