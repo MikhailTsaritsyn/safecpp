@@ -4,7 +4,9 @@ project(safecpp)
 set(CMAKE_CXX_STANDARD 23)
 
 # Add executable files
-add_executable(safecpp main.cpp)
+add_executable(safecpp
+        main.cpp
+)
 
 # Compiler static analysis flags
 target_compile_options(safecpp PRIVATE -Wall -Wextra -Wshadow -Wconversion -Wpedantic -Werror)
@@ -17,3 +19,5 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(safecpp PRIVATE -Wlong-long)
 endif ()
 
+# Add GTest
+include(setupGTest.cmake)
