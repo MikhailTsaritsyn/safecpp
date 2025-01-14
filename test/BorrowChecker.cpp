@@ -101,3 +101,36 @@ TEST(BorrowChecker, NonThrowingSync) {
 
     EXPECT_EQ(*result.immut(), (std::vector<size_t>{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }));
 }
+
+/// Test synchronization using waiting borrow API
+TEST(BorrowChecker, WaitingSync) {
+    std::mt19937 gen{ 0 };
+
+    safe::BorrowChecker<size_t> bc(0);
+
+    safe::BorrowChecker<std::vector<size_t>> result{ std::vector<size_t>() };
+    const auto executable = [&bc, &gen, &result](const size_t i) {
+        std::uniform_int_distribution<size_t> distr(0, 100);
+        std::this_thread::sleep_for(std::chrono::milliseconds(distr(gen)));
+        {
+            auto x   = bc.mut_waiting(std::chrono::microseconds(100), std::chrono::seconds(1));
+            auto vec = result.mut_waiting(std::chrono::microseconds(100), std::chrono::seconds(1));
+            vec->push_back((*x)++);
+            std::cout << std::format("Thread {}: counter by mutable = {}\n", i, *x) << std::flush;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(distr(gen)));
+
+        const auto y = bc.immut_waiting(std::chrono::microseconds(100), std::chrono::seconds(1));
+        std::cout << std::format("Thread {}: counter by immutable = {}\n", i, *y) << std::flush;
+    };
+
+    {
+        std::vector<std::jthread> threads;
+        threads.reserve(10);
+
+        for (size_t i = 0; i < 10; i++) threads.emplace_back(executable, i);
+    }
+
+    EXPECT_EQ(*result.immut(), (std::vector<size_t>{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }));
+}

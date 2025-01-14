@@ -28,27 +28,43 @@ public:
      */
     constexpr explicit ReferenceImmutable(const T &ref, internal::ReferenceCounter<size_t> &count) noexcept
             : _ref(ref),
-              _count(count) {
-        _count.inc();
+              _count(&count) {
+        _count->inc();
     }
 
     /**
      * @brief Copy the wrapper and increase the reference counter
      */
     constexpr ReferenceImmutable(const ReferenceImmutable &other) noexcept : _ref(other._ref), _count(other._count) {
-        _count.inc();
+        if (_count) _count->inc();
     }
 
-    ReferenceImmutable &operator=(const ReferenceImmutable &) noexcept = delete;
-    ReferenceImmutable(ReferenceImmutable &&other) noexcept            = delete;
-    ReferenceImmutable &operator=(ReferenceImmutable &&) noexcept      = delete;
+    ReferenceImmutable &operator=(const ReferenceImmutable &other) noexcept {
+        if (this == &other) return *this;
+        _ref   = other._ref;
+        _count = other._count;
+        if (_count) _count->inc();
+        return *this;
+    }
+
+    ReferenceImmutable(ReferenceImmutable &&other) noexcept : _ref(other._ref), _count(other._count) {
+        other._count = nullptr;
+    }
+
+    ReferenceImmutable &operator=(ReferenceImmutable &&other) noexcept {
+        if (this == &other) return *this;
+        _ref         = other._ref;
+        _count       = other._count;
+        other._count = nullptr;
+        return *this;
+    }
 
     /**
      * @brief Decrease the reference counter
      */
     constexpr ~ReferenceImmutable() noexcept {
         try {
-            _count.dec();
+            if (_count) _count->dec();
         } catch (std::runtime_error &) { assert("Reference count is already zero" && false); }
     }
 
@@ -69,10 +85,12 @@ private:
     /**
      * @brief Reference counter
      *
+     * Can only be @p nullptr if the object was moved away.
+     *
      * @note Is increased exactly once in the constructor and decreased exactly
      * once in the destructor
      */
-    internal::ReferenceCounter<size_t> &_count;
+    internal::ReferenceCounter<size_t> *_count;
 };
 
 } // namespace safe

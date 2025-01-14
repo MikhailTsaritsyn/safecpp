@@ -28,22 +28,31 @@ public:
      *
      * @throws std::runtime_error If the lock is already acquired
      */
-    constexpr explicit ReferenceMutable(T &ref, internal::ReferenceLock &lock) : _ref(ref), _lock(lock) {
-        _lock.lock();
+    constexpr explicit ReferenceMutable(T &ref, internal::ReferenceLock &lock) : _ref(ref), _lock(&lock) {
+        _lock->lock();
     }
 
     ReferenceMutable(const ReferenceMutable &) noexcept            = delete;
     ReferenceMutable &operator=(const ReferenceMutable &) noexcept = delete;
 
-    ReferenceMutable(ReferenceMutable &&) noexcept            = default;
-    ReferenceMutable &operator=(ReferenceMutable &&) noexcept = default;
+    ReferenceMutable(ReferenceMutable &&other) noexcept : _ref(other._ref), _lock(other._lock) {
+        other._lock = nullptr;
+    }
+
+    ReferenceMutable &operator=(ReferenceMutable &&other) noexcept {
+        if (this == &other) return *this;
+        _ref        = other._ref;
+        _lock       = other._lock;
+        other._lock = nullptr;
+        return *this;
+    }
 
     /**
      * @brief Releases the wrapped reference allowing to borrow it again
      */
     constexpr ~ReferenceMutable() noexcept {
         try {
-            _lock.unlock();
+            if (_lock) _lock->unlock();
         } catch (std::runtime_error &) { assert("Lock has been reset" && false); }
     }
 
@@ -77,10 +86,12 @@ private:
     /**
      * @brief Reference counter
      *
+     * Can only be @p nullptr if the object was moved away.
+     *
      * It is acquired on construction and released on destruction.
      * When @p true, no other references to the object can be borrowed.
      */
-    internal::ReferenceLock &_lock;
+    internal::ReferenceLock *_lock;
 };
 } // namespace safe
 

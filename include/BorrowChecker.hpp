@@ -6,6 +6,7 @@
 #define SAFE_BORROW_CHECKER_HPP
 #include <format>
 #include <optional>
+#include <thread>
 
 #include "ReferenceImmutable.hpp"
 #include "ReferenceMutable.hpp"
@@ -57,7 +58,7 @@ public:
     /**
      * @brief Borrow a mutable reference to the managed value
      *
-     * Unlike @link mut @endlink does not throw if it is impossible to borrow.
+     * Unlike @link mut @endlink doesn't throw if it's impossible to borrow.
      * Instead, returns @p nullopt on failure.
      *
      * @return @p nullopt if and only if one of the following prevents the borrow:
@@ -67,7 +68,25 @@ public:
     [[nodiscard]] constexpr std::optional<ReferenceMutable<T>> mut_optional() noexcept {
         if (_immutable_count.value() != 0) return std::nullopt;
         if (_mutable_lock.locked()) return std::nullopt;
-        return std::make_optional<ReferenceMutable<T>>(_value, _mutable_lock);
+        return ReferenceMutable<T>(_value, _mutable_lock);
+    }
+
+    /**
+     * @brief Borrow a mutable reference to the managed value
+     *
+     * Unlike @link mut @endlink, retries access after a certain period of time until succeeds or the timeout exceeds.
+     * Designed for synchronization across multiple threads.
+     *
+     * @param retry Time period between consecutive access tries
+     * @param timeout Timeout after which it exits forcefully.
+     *                If @p nullopt given, it tries indefinitely.
+     *
+     * @throws std::runtime_error if and only if timeout is given and has exceeded
+     */
+    [[nodiscard]] constexpr ReferenceMutable<T>
+    mut_waiting(const std::chrono::system_clock::duration &retry,
+                const std::optional<std::chrono::system_clock::duration> &timeout = std::nullopt) {
+        return access_waiting(&BorrowChecker::mut_optional, retry, timeout);
     }
 
     /**
@@ -84,17 +103,53 @@ public:
     /**
      * @brief Borrow an immutable reference to the managed value
      *
-     * Unlike @link immut @endlink does not throw.
+     * Unlike @link immut @endlink doesn't throw.
      * Instead, returns @p nullopt on failure.
      *
      * @return @p nullopt if and only if a mutable reference has been already borrowed
      */
     [[nodiscard]] constexpr std::optional<ReferenceImmutable<T>> immut_optional() noexcept {
         if (_mutable_lock.locked()) return std::nullopt;
-        return std::make_optional<ReferenceImmutable<T>>(_value, _immutable_count);
+        return ReferenceImmutable<T>(_value, _immutable_count);
+    }
+
+    /**
+     * @brief Borrow an immutable reference to the managed value
+     *
+     * Unlike @link immut @endlink, retries access after a certain period of time until succeeds or the timeout exceeds.
+     * Designed for synchronization across multiple threads.
+     *
+     * @param retry Time period between consecutive access tries
+     * @param timeout Timeout after which it exits forcefully.
+     *                If @p nullopt given, it tries indefinitely.
+     *
+     * @throws std::runtime_error if and only if timeout is given and has exceeded
+     */
+    [[nodiscard]] constexpr ReferenceImmutable<T>
+    immut_waiting(const std::chrono::system_clock::duration &retry,
+                  const std::optional<std::chrono::system_clock::duration> &timeout = std::nullopt) {
+        return access_waiting(&BorrowChecker::immut_optional, retry, timeout);
     }
 
 private:
+    [[nodiscard]] constexpr auto
+    access_waiting(auto &&access,
+                   const std::chrono::system_clock::duration &retry,
+                   const std::optional<std::chrono::system_clock::duration> &timeout = std::nullopt) {
+        const auto startTime       = std::chrono::system_clock::now();
+        const auto should_continue = [&timeout, &startTime] noexcept {
+            if (timeout) return std::chrono::system_clock::now() < startTime + *timeout;
+            return true;
+        };
+
+        while (should_continue()) {
+            if (auto result = (this->*access)()) return *std::move(result);
+            std::this_thread::sleep_for(retry);
+        }
+
+        throw std::runtime_error("Timeout exceeded");
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const BorrowChecker &bc) noexcept {
         return os << std::format("BorrowChecker(mutable = {}, immutable = {})",
                                  bc._mutable_lock.locked() ? "yes" : "no",
@@ -104,12 +159,12 @@ private:
     T _value;
 
     /**
-     * @note Cannot be modified inside this class, but only by borrowed @link ReferenceMutable @endlink
+     * @note Can't be modified inside this class, but only by borrowed @link ReferenceMutable @endlink
      */
     internal::ReferenceLock _mutable_lock{};
 
     /**
-     * @note Cannot be modified inside this class, but only by borrowed @link ReferenceImmutable @endlink
+     * @note Can't be modified inside this class, but only by borrowed @link ReferenceImmutable @endlink
      */
     internal::ReferenceCounter<size_t> _immutable_count{};
 };
