@@ -23,26 +23,23 @@ public:
     /**
      * Sets the counter to zero
      */
-    constexpr ReferenceCounter() = default;
+    constexpr ReferenceCounter() noexcept                                    = default;
+    constexpr ReferenceCounter(const ReferenceCounter &) noexcept            = delete;
+    constexpr ReferenceCounter(ReferenceCounter &&) noexcept                 = default;
+    constexpr ReferenceCounter &operator=(const ReferenceCounter &) noexcept = delete;
+    constexpr ReferenceCounter &operator=(ReferenceCounter &&) noexcept      = default;
 
     /**
      * @brief Increment the counter
      */
-    constexpr void inc() noexcept {
-        std::lock_guard guard(_mutex);
-        ++_value;
-    }
+    constexpr void inc() noexcept;
 
     /**
      * @brief Decrement the counter
      *
      * @throws std::runtime_error if the counter is already zero
      */
-    constexpr void dec() {
-        std::lock_guard guard(_mutex);
-        if (_value == 0) throw std::invalid_argument("Counter value is zero");
-        --_value;
-    }
+    constexpr void dec();
 
     /**
      * @return The current value of the counter
@@ -53,6 +50,21 @@ private:
     T _value = 0;
     std::mutex _mutex{}; ///< Mutex guarding increment and decrement of the counter
 };
+
+template <typename T>
+    requires(std::is_unsigned_v<T> && std::is_integral_v<T>)
+constexpr void ReferenceCounter<T>::inc() noexcept {
+    std::lock_guard guard(_mutex);
+    ++_value;
+}
+
+template <typename T>
+    requires(std::is_unsigned_v<T> && std::is_integral_v<T>)
+constexpr void ReferenceCounter<T>::dec() {
+    std::lock_guard guard(_mutex);
+    if (_value == 0) throw std::invalid_argument("Counter value is zero");
+    --_value;
+}
 
 } // namespace safe::internal
 

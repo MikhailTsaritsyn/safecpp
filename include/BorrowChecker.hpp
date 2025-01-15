@@ -25,14 +25,16 @@ namespace safe {
  *
  * @tparam T Referenced type
  */
-template<typename T>
+template <typename T>
     requires(!std::is_reference_v<T>)
 class BorrowChecker {
 public:
     BorrowChecker() noexcept = delete;
-    BorrowChecker(const BorrowChecker &) noexcept = delete;
-    BorrowChecker &operator=(const BorrowChecker &) noexcept = delete;
+
+    BorrowChecker(const BorrowChecker &other) noexcept : _value(other._value) {}
+
     BorrowChecker(BorrowChecker &&other) noexcept = delete;
+    BorrowChecker &operator=(const BorrowChecker &other) noexcept = delete;
     BorrowChecker &operator=(BorrowChecker &&other) noexcept = delete;
 
     /**
@@ -40,8 +42,7 @@ public:
      *
      * @param args Constructor arguments
      */
-    template<typename... Args>
-    constexpr explicit BorrowChecker(Args &&...args) : _value(args...) {}
+    template <typename... Args> constexpr explicit BorrowChecker(Args &&...args) : _value(args...) {}
 
     /**
      * @brief Borrow a mutable reference to the managed value
@@ -49,11 +50,7 @@ public:
      * @throws std::runtime_error if another mutable reference has been already borrowed
      * @throws std::runtime_error if an immutable reference has been already borrowed
      */
-    [[nodiscard]] constexpr ReferenceMutable<T> mut() {
-        if (_immutable_count.value() != 0)
-            throw std::runtime_error("Attempt to borrow a mutable reference when already borrowed an immutable one");
-        return ReferenceMutable<T>(_value, _mutable_lock);
-    }
+    [[nodiscard]] constexpr ReferenceMutable<T> mut();
 
     /**
      * @brief Borrow a mutable reference to the managed value
@@ -65,11 +62,7 @@ public:
      *         - Any number of immutable references has been already borrowed
      *         - Another mutable reference has been already borrowed
      */
-    [[nodiscard]] constexpr std::optional<ReferenceMutable<T>> mut_optional() noexcept {
-        if (_immutable_count.value() != 0) return std::nullopt;
-        if (_mutable_lock.locked()) return std::nullopt;
-        return ReferenceMutable<T>(_value, _mutable_lock);
-    }
+    [[nodiscard]] constexpr std::optional<ReferenceMutable<T>> mut_optional() noexcept;
 
     /**
      * @brief Borrow a mutable reference to the managed value
@@ -94,11 +87,7 @@ public:
      *
      * @throws std::runtime_error if a mutable reference has been already borrowed
      */
-    [[nodiscard]] constexpr ReferenceImmutable<T> immut() {
-        if (_mutable_lock.locked())
-            throw std::runtime_error("Attempt to borrow an immutable reference when already borrowed a mutable one");
-        return ReferenceImmutable<T>(_value, _immutable_count);
-    }
+    [[nodiscard]] constexpr ReferenceImmutable<T> immut();
 
     /**
      * @brief Borrow an immutable reference to the managed value
@@ -108,10 +97,7 @@ public:
      *
      * @return @p nullopt if and only if a mutable reference has been already borrowed
      */
-    [[nodiscard]] constexpr std::optional<ReferenceImmutable<T>> immut_optional() noexcept {
-        if (_mutable_lock.locked()) return std::nullopt;
-        return ReferenceImmutable<T>(_value, _immutable_count);
-    }
+    [[nodiscard]] constexpr std::optional<ReferenceImmutable<T>> immut_optional() noexcept;
 
     /**
      * @brief Borrow an immutable reference to the managed value
@@ -135,20 +121,7 @@ private:
     [[nodiscard]] constexpr auto
     access_waiting(auto &&access,
                    const std::chrono::system_clock::duration &retry,
-                   const std::optional<std::chrono::system_clock::duration> &timeout = std::nullopt) {
-        const auto startTime       = std::chrono::system_clock::now();
-        const auto should_continue = [&timeout, &startTime] noexcept {
-            if (timeout) return std::chrono::system_clock::now() < startTime + *timeout;
-            return true;
-        };
-
-        while (should_continue()) {
-            if (auto result = (this->*access)()) return *std::move(result);
-            std::this_thread::sleep_for(retry);
-        }
-
-        throw std::runtime_error("Timeout exceeded");
-    }
+                   const std::optional<std::chrono::system_clock::duration> &timeout = std::nullopt);
 
     friend std::ostream &operator<<(std::ostream &os, const BorrowChecker &bc) noexcept {
         return os << std::format("BorrowChecker(mutable = {}, immutable = {})",
@@ -168,6 +141,56 @@ private:
      */
     internal::ReferenceCounter<size_t> _immutable_count{};
 };
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+constexpr ReferenceMutable<T> BorrowChecker<T>::mut() {
+    if (_immutable_count.value() != 0)
+        throw std::runtime_error("Attempt to borrow a mutable reference when already borrowed an immutable one");
+    return ReferenceMutable<T>(_value, _mutable_lock);
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+constexpr std::optional<ReferenceMutable<T>> BorrowChecker<T>::mut_optional() noexcept {
+    if (_immutable_count.value() != 0) return std::nullopt;
+    if (_mutable_lock.locked()) return std::nullopt;
+    return ReferenceMutable<T>(_value, _mutable_lock);
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+constexpr ReferenceImmutable<T> BorrowChecker<T>::immut() {
+    if (_mutable_lock.locked())
+        throw std::runtime_error("Attempt to borrow an immutable reference when already borrowed a mutable one");
+    return ReferenceImmutable<T>(_value, _immutable_count);
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+constexpr std::optional<ReferenceImmutable<T>> BorrowChecker<T>::immut_optional() noexcept {
+    if (_mutable_lock.locked()) return std::nullopt;
+    return ReferenceImmutable<T>(_value, _immutable_count);
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+constexpr auto BorrowChecker<T>::access_waiting(auto &&access,
+                                                const std::chrono::system_clock::duration &retry,
+                                                const std::optional<std::chrono::system_clock::duration> &timeout) {
+    const auto startTime       = std::chrono::system_clock::now();
+    const auto should_continue = [&timeout, &startTime] noexcept {
+        if (timeout) return std::chrono::system_clock::now() < startTime + *timeout;
+        return true;
+    };
+
+    while (should_continue()) {
+        if (auto result = (this->*access)()) return *std::move(result);
+        std::this_thread::sleep_for(retry);
+    }
+
+    throw std::runtime_error("Timeout exceeded");
+}
 } // namespace safe
 
 #endif // SAFE_BORROW_CHECKER_HPP

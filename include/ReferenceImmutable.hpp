@@ -39,34 +39,18 @@ public:
         if (_count) _count->inc();
     }
 
-    ReferenceImmutable &operator=(const ReferenceImmutable &other) noexcept {
-        if (this == &other) return *this;
-        _ref   = other._ref;
-        _count = other._count;
-        if (_count) _count->inc();
-        return *this;
-    }
+    ReferenceImmutable &operator=(const ReferenceImmutable &other) noexcept;
 
     ReferenceImmutable(ReferenceImmutable &&other) noexcept : _ref(other._ref), _count(other._count) {
         other._count = nullptr;
     }
 
-    ReferenceImmutable &operator=(ReferenceImmutable &&other) noexcept {
-        if (this == &other) return *this;
-        _ref         = other._ref;
-        _count       = other._count;
-        other._count = nullptr;
-        return *this;
-    }
+    ReferenceImmutable &operator=(ReferenceImmutable &&other) noexcept;
 
     /**
      * @brief Decrease the reference counter
      */
-    constexpr ~ReferenceImmutable() noexcept {
-        try {
-            if (_count) _count->dec();
-        } catch (std::runtime_error &) { assert("Reference count is already zero" && false); }
-    }
+    constexpr ~ReferenceImmutable() noexcept;
 
     // ReSharper disable once CppNonExplicitConversionOperator
     /**
@@ -92,6 +76,34 @@ private:
      */
     internal::ReferenceCounter<size_t> *_count;
 };
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+constexpr ReferenceImmutable<T>::~ReferenceImmutable() noexcept {
+    try {
+        if (_count) _count->dec();
+    } catch (std::runtime_error &) { assert("Reference count is already zero" && false); }
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+ReferenceImmutable<T> &ReferenceImmutable<T>::operator=(const ReferenceImmutable &other) noexcept {
+    if (this == &other) return *this;
+    _ref   = other._ref;
+    _count = other._count;
+    if (_count) _count->inc();
+    return *this;
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
+ReferenceImmutable<T> &ReferenceImmutable<T>::operator=(ReferenceImmutable &&other) noexcept {
+    if (this == &other) return *this;
+    _ref         = other._ref;
+    _count       = other._count;
+    other._count = nullptr;
+    return *this;
+}
 
 } // namespace safe
 
