@@ -12,6 +12,8 @@
 #include "ReferenceImmutable.hpp"
 #include "ReferenceMutable.hpp"
 
+// TODO: Make optional API the primary one and throwing API dependent on it
+
 namespace safe {
 /**
  * @brief Class that wraps a given value and tracks references to it
@@ -159,9 +161,11 @@ constexpr ReferenceMutable<T> BorrowChecker<T>::mut() {
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr std::optional<ReferenceMutable<T>> BorrowChecker<T>::mut_optional() noexcept {
+    // BUG: Non-atomic
     if (_immutable_count.value() != 0) return std::nullopt;
-    if (_mutable_lock.locked()) return std::nullopt;
-    return ReferenceMutable<T>(_value, _mutable_lock);
+    try {
+        return ReferenceMutable<T>(_value, _mutable_lock);
+    } catch (std::runtime_error &) { return std::nullopt; }
 }
 
 template <typename T>
@@ -175,6 +179,7 @@ constexpr ReferenceImmutable<T> BorrowChecker<T>::immut() {
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr std::optional<ReferenceImmutable<T>> BorrowChecker<T>::immut_optional() noexcept {
+    // BUG: Non-atomic
     if (_mutable_lock.locked()) return std::nullopt;
     return ReferenceImmutable<T>(_value, _immutable_count);
 }
