@@ -1,0 +1,6 @@
+This project uses force exit to signal errors that can't be signaled any other way.
+Below is the list of error codes used.
+
+| Code | Description        |
+|------|:-------------------|
+| 160  | Dangling reference |

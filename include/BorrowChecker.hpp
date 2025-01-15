@@ -5,13 +5,12 @@
 #ifndef SAFE_BORROW_CHECKER_HPP
 #define SAFE_BORROW_CHECKER_HPP
 #include <format>
+#include <iostream>
 #include <optional>
 #include <thread>
 
 #include "ReferenceImmutable.hpp"
 #include "ReferenceMutable.hpp"
-
-// TODO: Mechanism to prevent dangling references?
 
 namespace safe {
 /**
@@ -43,6 +42,13 @@ public:
      * @param args Constructor arguments
      */
     template <typename... Args> constexpr explicit BorrowChecker(Args &&...args) : _value(args...) {}
+
+    ~BorrowChecker() noexcept {
+        if (_immutable_count.value() != 0 || _mutable_lock.locked()) {
+            std::cerr << "Dangling reference detected\n";
+            exit(160);
+        }
+    }
 
     /**
      * @brief Borrow a mutable reference to the managed value

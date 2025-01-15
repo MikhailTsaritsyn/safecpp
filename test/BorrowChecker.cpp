@@ -134,3 +134,20 @@ TEST(BorrowChecker, WaitingSync) {
 
     EXPECT_EQ(*result.immut(), (std::vector<size_t>{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }));
 }
+
+safe::ReferenceMutable<int> return_mut_ref() {
+    safe::BorrowChecker<int> x(5);
+    return x.mut();
+}
+
+safe::ReferenceImmutable<int> return_immut_ref() {
+    safe::BorrowChecker<int> x(5);
+    return x.immut();
+}
+
+TEST(BorrowChecker, DanglingReference) {
+    EXPECT_EXIT(auto ref_immut = return_immut_ref(), ::testing::ExitedWithCode(160), "")
+        << "Dangling immutable reference was not prevented";
+    EXPECT_EXIT(auto ref_mut = return_mut_ref(), ::testing::ExitedWithCode(160), "")
+        << "Dangling mutable reference was not prevented";
+}
