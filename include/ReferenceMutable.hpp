@@ -86,7 +86,10 @@ template <typename T>
 constexpr ReferenceMutable<T>::~ReferenceMutable() noexcept {
     try {
         if (_lock) _lock->unlock();
-    } catch (std::runtime_error &) { assert("Lock has been reset" && false); }
+    } catch (std::runtime_error &) {
+        std::cerr << "Double release of a mutable reference\n";
+        exit(161);
+    }
 }
 
 template <typename T>

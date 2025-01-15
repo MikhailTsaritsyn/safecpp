@@ -82,7 +82,10 @@ template <typename T>
 constexpr ReferenceImmutable<T>::~ReferenceImmutable() noexcept {
     try {
         if (_count) _count->dec();
-    } catch (std::runtime_error &) { assert("Reference count is already zero" && false); }
+    } catch (std::runtime_error &) {
+        std::cerr << "Double release of an immutable reference\n";
+        exit(161);
+    }
 }
 
 template <typename T>

@@ -151,3 +151,25 @@ TEST(BorrowChecker, DanglingReference) {
     EXPECT_EXIT(auto ref_mut = return_mut_ref(), ::testing::ExitedWithCode(160), "")
         << "Dangling mutable reference was not prevented";
 }
+
+TEST(BorrowChecker, DoubleRelease) {
+    EXPECT_EXIT(
+        {
+            safe::BorrowChecker<int> x{ 5 };
+            auto ref = x.mut();
+            ref.~ReferenceMutable();
+        },
+        ::testing::ExitedWithCode(161),
+        "")
+        << "Double release of a mutable reference was not prevented";
+
+    EXPECT_EXIT(
+        {
+            safe::BorrowChecker<int> x{ 5 };
+            auto ref = x.immut();
+            ref.~ReferenceImmutable();
+        },
+        ::testing::ExitedWithCode(161),
+        "")
+        << "Double release of an immutable reference was not prevented";
+}
