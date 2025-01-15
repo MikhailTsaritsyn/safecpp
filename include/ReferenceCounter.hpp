@@ -62,7 +62,7 @@ template <typename T>
     requires(std::is_unsigned_v<T> && std::is_integral_v<T>)
 constexpr void ReferenceCounter<T>::dec() {
     std::lock_guard guard(_mutex);
-    if (_value == 0) throw std::invalid_argument("Counter value is zero");
+    if (_value == 0) throw std::runtime_error("Counter value is zero");
     --_value;
 }
 
