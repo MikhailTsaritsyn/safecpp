@@ -19,7 +19,7 @@ add_executable(safecpp_test)
 target_sources(safecpp_test PRIVATE
         tests/BorrowChecker.cpp
 )
-
+target_compile_options(safecpp_test PRIVATE -Werror)
 target_link_libraries(safecpp_test PRIVATE safecpp gtest_main)
 
 include(GoogleTest)

@@ -24,11 +24,9 @@ public:
      *
      * @note Should only be called by @link BorrowChecker @endlink
      *
-     * @throws std::runtime_error If the lock is already acquired
+     * @return @p std::nullopt if and only if the locked is already locked
      */
-    constexpr explicit ReferenceMutable(T &ref, internal::ReferenceLock &lock) : _ref(ref), _lock(&lock) {
-        _lock->lock();
-    }
+    [[nodiscard]] constexpr static std::optional<ReferenceMutable> create(T &ref, internal::ReferenceLock &lock) noexcept;
 
     ReferenceMutable(const ReferenceMutable &) noexcept            = delete;
     ReferenceMutable &operator=(const ReferenceMutable &) noexcept = delete;
@@ -66,6 +64,8 @@ public:
     [[nodiscard]] constexpr T *operator->() noexcept { return &_ref; }
 
 private:
+    constexpr explicit ReferenceMutable(T &ref, internal::ReferenceLock &lock) : _ref(ref), _lock(&lock) {}
+
     T &_ref; /// Reference to the tracked object
 
     /**
@@ -81,10 +81,16 @@ private:
 
 template <typename T>
     requires(!std::is_reference_v<T>)
+constexpr std::optional<ReferenceMutable<T>> ReferenceMutable<T>::create(T &ref,
+                                                                         internal::ReferenceLock &lock) noexcept {
+    if (!lock.lock()) return std::nullopt;
+    return ReferenceMutable(ref, lock);
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
 constexpr ReferenceMutable<T>::~ReferenceMutable() noexcept {
-    try {
-        if (_lock) _lock->unlock();
-    } catch (std::runtime_error &) {
+    if (_lock && !_lock->unlock()) {
         std::cerr << "Double release of a mutable reference\n";
         exit(161);
     }

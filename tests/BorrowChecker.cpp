@@ -156,7 +156,8 @@ TEST(BorrowChecker, DoubleRelease) {
     EXPECT_EXIT(
         {
             safe::BorrowChecker<int> x{ 5 };
-            auto ref = x.mut();
+            // volatile prevents the compiler from optimizing ref away
+            volatile auto ref = x.mut();
             ref.~ReferenceMutable();
         },
         ::testing::ExitedWithCode(161),
@@ -165,8 +166,9 @@ TEST(BorrowChecker, DoubleRelease) {
 
     EXPECT_EXIT(
         {
+            // volatile prevents the compiler from optimizing ref away
             safe::BorrowChecker<int> x{ 5 };
-            auto ref = x.immut();
+            volatile auto ref = x.immut();
             ref.~ReferenceImmutable();
         },
         ::testing::ExitedWithCode(161),

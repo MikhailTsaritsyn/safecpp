@@ -26,14 +26,14 @@ public:
     constexpr ReferenceLock &operator=(ReferenceLock &&) noexcept      = delete;
 
     /**
-     * @throws std::runtime_error If the lock is already acquired
+     * @return @p true if and only if executed successfully
      */
-    void lock();
+    [[nodiscard]] bool lock() noexcept;
 
     /**
-     * @throws std::runtime_error If the lock is already released
+     * @return @p true if and only if executed successfully
      */
-    void unlock();
+    [[nodiscard]] bool unlock() noexcept;
 
     [[nodiscard]] constexpr bool locked() const noexcept { return _locked; }
 

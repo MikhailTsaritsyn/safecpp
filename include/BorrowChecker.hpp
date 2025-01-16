@@ -12,8 +12,6 @@
 #include "ReferenceImmutable.hpp"
 #include "ReferenceMutable.hpp"
 
-// TODO: Make optional API the primary one and throwing API dependent on it
-
 namespace safe {
 /**
  * @brief Class that wraps a given value and tracks references to it
@@ -34,9 +32,9 @@ public:
 
     BorrowChecker(const BorrowChecker &other) noexcept : _value(other._value) {}
 
-    BorrowChecker(BorrowChecker &&other) noexcept = delete;
+    BorrowChecker(BorrowChecker &&other) noexcept                 = delete;
     BorrowChecker &operator=(const BorrowChecker &other) noexcept = delete;
-    BorrowChecker &operator=(BorrowChecker &&other) noexcept = delete;
+    BorrowChecker &operator=(BorrowChecker &&other) noexcept      = delete;
 
     /**
      * @brief Construct a value in-place and manage references to it
@@ -45,12 +43,7 @@ public:
      */
     template <typename... Args> constexpr explicit BorrowChecker(Args &&...args) : _value(args...) {}
 
-    ~BorrowChecker() noexcept {
-        if (_immutable_count.value() != 0 || _mutable_lock.locked()) {
-            std::cerr << "Dangling reference detected\n";
-            exit(160);
-        }
-    }
+    ~BorrowChecker() noexcept;
 
     /**
      * @brief Borrow a mutable reference to the managed value
@@ -152,20 +145,27 @@ private:
 
 template <typename T>
     requires(!std::is_reference_v<T>)
+BorrowChecker<T>::~BorrowChecker() noexcept {
+    if (_immutable_count.value() != 0 || _mutable_lock.locked()) {
+        std::cerr << "Dangling reference detected\n";
+        exit(160);
+    }
+}
+
+template <typename T>
+    requires(!std::is_reference_v<T>)
 constexpr ReferenceMutable<T> BorrowChecker<T>::mut() {
     if (_immutable_count.value() != 0)
         throw std::runtime_error("Attempt to borrow a mutable reference when already borrowed an immutable one");
-    return ReferenceMutable<T>(_value, _mutable_lock);
+    if (auto result = ReferenceMutable<T>::create(_value, _mutable_lock)) return *std::move(result);
+    else throw std::runtime_error("Attempt to borrow a second mutable reference");
 }
 
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr std::optional<ReferenceMutable<T>> BorrowChecker<T>::mut_optional() noexcept {
-    // BUG: Non-atomic
     if (_immutable_count.value() != 0) return std::nullopt;
-    try {
-        return ReferenceMutable<T>(_value, _mutable_lock);
-    } catch (std::runtime_error &) { return std::nullopt; }
+    return ReferenceMutable<T>::create(_value, _mutable_lock);
 }
 
 template <typename T>

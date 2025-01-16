@@ -31,9 +31,9 @@ public:
     /**
      * @brief Decrement the counter
      *
-     * @throws std::runtime_error if the counter is already zero
+     * @return @p false if and only if the counter is zero
      */
-    void dec();
+    [[nodiscard]] bool dec() noexcept;
 
     /**
      * @return The current value of the counter

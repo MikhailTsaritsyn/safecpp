@@ -78,9 +78,7 @@ private:
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr ReferenceImmutable<T>::~ReferenceImmutable() noexcept {
-    try {
-        if (_count) _count->dec();
-    } catch (std::runtime_error &) {
+    if (_count && !_count->dec()) {
         std::cerr << "Double release of an immutable reference\n";
         exit(161);
     }
