@@ -147,7 +147,7 @@ private:
     /**
      * @note Can't be modified inside this class, but only by borrowed @link ReferenceImmutable @endlink
      */
-    internal::ReferenceCounter<size_t> _immutable_count{};
+    internal::ReferenceCounter _immutable_count{};
 };
 
 template <typename T>

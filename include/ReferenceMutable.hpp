@@ -4,9 +4,7 @@
 
 #ifndef SAFE_REFERENCE_MUTABLE_HPP
 #define SAFE_REFERENCE_MUTABLE_HPP
-#include <cassert>
-
-#include "ReferenceLock.hpp"
+#include "internal/ReferenceLock.hpp"
 
 namespace safe {
 /**

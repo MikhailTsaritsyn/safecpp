@@ -4,9 +4,7 @@
 
 #ifndef SAFE_REFERENCE_IMMUTABLE_HPP
 #define SAFE_REFERENCE_IMMUTABLE_HPP
-#include <cassert>
-
-#include "ReferenceCounter.hpp"
+#include "internal/ReferenceCounter.hpp"
 
 namespace safe {
 /**
@@ -26,7 +24,7 @@ public:
      *
      * @note Should only be called by @link BorrowChecker @endlink
      */
-    constexpr explicit ReferenceImmutable(const T &ref, internal::ReferenceCounter<size_t> &count) noexcept
+    constexpr explicit ReferenceImmutable(const T &ref, internal::ReferenceCounter &count) noexcept
             : _ref(ref),
               _count(&count) {
         _count->inc();
@@ -74,7 +72,7 @@ private:
      * @note Is increased exactly once in the constructor and decreased exactly
      * once in the destructor
      */
-    internal::ReferenceCounter<size_t> *_count;
+    internal::ReferenceCounter *_count;
 };
 
 template <typename T>

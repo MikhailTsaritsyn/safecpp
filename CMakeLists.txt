@@ -4,10 +4,11 @@ project(safecpp)
 set(CMAKE_CXX_STANDARD 23)
 
 # Add executable files
-add_executable(safecpp
-        main.cpp
+add_library(safecpp STATIC
+        lib/ReferenceLock.cpp
+        lib/ReferenceCounter.cpp
 )
-target_include_directories(safecpp PUBLIC include)
+target_include_directories(safecpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Compiler static analysis flags
 target_compile_options(safecpp PRIVATE -Wall -Wextra -Wshadow -Wconversion -Wpedantic -Werror)

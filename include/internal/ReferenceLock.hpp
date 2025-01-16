@@ -5,7 +5,6 @@
 #ifndef SAFE_REFERENCE_LOCK_HPP
 #define SAFE_REFERENCE_LOCK_HPP
 #include <mutex>
-#include <stdexcept>
 
 namespace safe::internal {
 /**
@@ -29,12 +28,12 @@ public:
     /**
      * @throws std::runtime_error If the lock is already acquired
      */
-    constexpr void lock();
+    void lock();
 
     /**
      * @throws std::runtime_error If the lock is already released
      */
-    constexpr void unlock();
+    void unlock();
 
     [[nodiscard]] constexpr bool locked() const noexcept { return _locked; }
 
@@ -42,26 +41,6 @@ private:
     bool _locked = false;
     std::mutex _mutex{}; ///< Mutex guarding lock state changes
 };
-
-constexpr void ReferenceLock::lock() {
-    _mutex.lock();
-    if (_locked) {
-        _mutex.unlock();
-        throw std::runtime_error("Lock is already acquired");
-    }
-    _locked = true;
-    _mutex.unlock();
-}
-
-constexpr void ReferenceLock::unlock() {
-    _mutex.lock();
-    if (!_locked) {
-        _mutex.unlock();
-        throw std::runtime_error("Lock is already released");
-    }
-    _locked = false;
-    _mutex.unlock();
-}
 } // namespace safe::internal
 
 #endif // SAFE_REFERENCE_LOCK_HPP
