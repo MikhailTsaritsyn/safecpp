@@ -73,11 +73,11 @@ PackConstructorInitializers: CurrentLine
 FixNamespaceComments: true
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '^"(llvm|llvm-c|clang|clang-c)/'
-    Priority: 2
-    CaseSensitive: false
-  - Regex: '^(<|"(gtest|gmock|isl|json)/)'
+  - Regex: '^<*?>$'
     Priority: 1
+    CaseSensitive: false
+  - Regex: '^"*?"$'
+    Priority: 2
     CaseSensitive: false
   - Regex: '.*'
     Priority: 3
