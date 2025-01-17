@@ -4,11 +4,13 @@
 
 #ifndef SAFE_REFERENCE_IMMUTABLE_HPP
 #define SAFE_REFERENCE_IMMUTABLE_HPP
-#include "internal/ReferenceCounter.hpp"
+#include "internal/ReferenceTracker.hpp"
+#include <concepts>
+#include <iostream>
 
 namespace safe {
 /**
- * @brief Wrapper around read-only reference to a type
+ * @brief Wrapper around read-only reference to a value
  *
  * @tparam T Referenced type
  */
@@ -16,45 +18,39 @@ template <typename T>
     requires(!std::is_reference_v<T>)
 class ReferenceImmutable {
 public:
-    /**
-     * @brief Construct a wrapper and increase the reference counter
-     *
-     * @param ref Reference to wrap
-     * @param count Reference counter to track
-     *
-     * @note Should only be called by @link BorrowChecker @endlink
-     */
-    constexpr explicit ReferenceImmutable(const T &ref, internal::ReferenceCounter &count) noexcept
-            : _ref(ref),
-              _count(&count) {
-        _count->inc();
+    ReferenceImmutable() = delete;
+
+    ReferenceImmutable(const ReferenceImmutable &other) noexcept : _ref(other._ref), _tracker(other._tracker) {
+        if (_tracker && !_tracker->register_immutable()) {
+            // Since an existing immutable reference is copied, it means that there can be no mutable references.
+            // Therefore, nothing can prevent registering another immutable reference.
+            // If it happens, it can only mean a bug in the implementation of this library, not in the used code.
+            std::cerr << "Failed to register a copy of an immutable reference\n";
+            exit(162);
+        }
     }
 
-    /**
-     * @brief Copy the wrapper and increase the reference counter
-     */
-    constexpr ReferenceImmutable(const ReferenceImmutable &other) noexcept : _ref(other._ref), _count(other._count) {
-        if (_count) _count->inc();
+    ReferenceImmutable &operator=(const ReferenceImmutable &) noexcept = delete;
+
+    ReferenceImmutable(ReferenceImmutable &&other) noexcept : _ref(other._ref), _tracker(other._tracker) {
+        other._tracker = nullptr;
     }
 
-    ReferenceImmutable &operator=(const ReferenceImmutable &other) noexcept;
+    ReferenceImmutable &operator=(ReferenceImmutable &&other) noexcept = delete;
 
-    ReferenceImmutable(ReferenceImmutable &&other) noexcept : _ref(other._ref), _count(other._count) {
-        other._count = nullptr;
+    ~ReferenceImmutable() noexcept {
+        if (_tracker && !_tracker->unregister_immutable()) {
+            std::cerr << "Double release of an immutable reference" << std::endl;
+            exit(161);
+        }
     }
 
-    ReferenceImmutable &operator=(ReferenceImmutable &&other) noexcept;
+    ReferenceImmutable(T &ref, internal::ReferenceTracker &tracker) noexcept : _ref(ref), _tracker(&tracker) {}
 
     /**
-     * @brief Decrease the reference counter
+     * @brief Get access to the underlying reference
      */
-    constexpr ~ReferenceImmutable() noexcept;
-
-    // ReSharper disable once CppNonExplicitConversionOperator
-    /**
-     * @brief Get read-only access to the wrapped reference
-     */
-    constexpr const T &operator*() const noexcept { return _ref; }
+    [[nodiscard]] constexpr const T &operator*() const noexcept { return _ref; }
 
     /**
      * @brief Access methods of the underlying object
@@ -62,48 +58,9 @@ public:
     [[nodiscard]] constexpr const T *operator->() const noexcept { return &_ref; }
 
 private:
-    const T &_ref;
-
-    /**
-     * @brief Reference counter
-     *
-     * Can only be @p nullptr if the object was moved away.
-     *
-     * @note Is increased exactly once in the constructor and decreased exactly
-     * once in the destructor
-     */
-    internal::ReferenceCounter *_count;
+    const T &_ref; /// Reference to the tracked object
+    internal::ReferenceTracker *_tracker;
 };
-
-template <typename T>
-    requires(!std::is_reference_v<T>)
-constexpr ReferenceImmutable<T>::~ReferenceImmutable() noexcept {
-    if (_count && !_count->dec()) {
-        std::cerr << "Double release of an immutable reference\n";
-        exit(161);
-    }
-}
-
-template <typename T>
-    requires(!std::is_reference_v<T>)
-ReferenceImmutable<T> &ReferenceImmutable<T>::operator=(const ReferenceImmutable &other) noexcept {
-    if (this == &other) return *this;
-    _ref   = other._ref;
-    _count = other._count;
-    if (_count) _count->inc();
-    return *this;
-}
-
-template <typename T>
-    requires(!std::is_reference_v<T>)
-ReferenceImmutable<T> &ReferenceImmutable<T>::operator=(ReferenceImmutable &&other) noexcept {
-    if (this == &other) return *this;
-    _ref         = other._ref;
-    _count       = other._count;
-    other._count = nullptr;
-    return *this;
-}
-
 } // namespace safe
 
 #endif // SAFE_REFERENCE_IMMUTABLE_HPP

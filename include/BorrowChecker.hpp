@@ -4,13 +4,13 @@
 
 #ifndef SAFE_BORROW_CHECKER_HPP
 #define SAFE_BORROW_CHECKER_HPP
+#include "ReferenceImmutable.hpp"
+#include "ReferenceMutable.hpp"
+#include "internal/ReferenceTracker.hpp"
 #include <format>
 #include <iostream>
 #include <optional>
 #include <thread>
-
-#include "ReferenceImmutable.hpp"
-#include "ReferenceMutable.hpp"
 
 namespace safe {
 /**
@@ -42,8 +42,6 @@ public:
      * @param args Constructor arguments
      */
     template <typename... Args> constexpr explicit BorrowChecker(Args &&...args) : _value(args...) {}
-
-    ~BorrowChecker() noexcept;
 
     /**
      * @brief Borrow a mutable reference to the managed value
@@ -126,62 +124,70 @@ private:
 
     friend std::ostream &operator<<(std::ostream &os, const BorrowChecker &bc) noexcept {
         return os << std::format("BorrowChecker(mutable = {}, immutable = {})",
-                                 bc._mutable_lock.locked() ? "yes" : "no",
-                                 bc._immutable_count.value());
+                                 bc._tracker.mutable_registered() ? "yes" : "no",
+                                 bc._tracker.immutables_counter());
     }
 
     T _value;
 
     /**
-     * @note Can't be modified inside this class, but only by borrowed @link ReferenceMutable @endlink
+     * @note Can't be modified inside this class, but only by borrowed references
      */
-    internal::ReferenceLock _mutable_lock{};
-
-    /**
-     * @note Can't be modified inside this class, but only by borrowed @link ReferenceImmutable @endlink
-     */
-    internal::ReferenceCounter _immutable_count{};
+    internal::ReferenceTracker _tracker;
 };
 
 template <typename T>
     requires(!std::is_reference_v<T>)
-BorrowChecker<T>::~BorrowChecker() noexcept {
-    if (_immutable_count.value() != 0 || _mutable_lock.locked()) {
-        std::cerr << "Dangling reference detected\n";
-        exit(160);
-    }
-}
-
-template <typename T>
-    requires(!std::is_reference_v<T>)
 constexpr ReferenceMutable<T> BorrowChecker<T>::mut() {
-    if (_immutable_count.value() != 0)
+    switch (_tracker.register_mutable()) {
+    case internal::ReferenceTracker::MutableRegisterStatus::SUCCESS: return ReferenceMutable(_value, _tracker);
+    case internal::ReferenceTracker::MutableRegisterStatus::MUTABLE_EXISTS:
+        throw std::runtime_error("Attempt to borrow a second mutable reference");
+    case internal::ReferenceTracker::MutableRegisterStatus::IMMUTABLE_EXISTS:
         throw std::runtime_error("Attempt to borrow a mutable reference when already borrowed an immutable one");
-    if (auto result = ReferenceMutable<T>::create(_value, _mutable_lock)) return *std::move(result);
-    else throw std::runtime_error("Attempt to borrow a second mutable reference");
+    }
+    std::cerr << "Unknown mutable borrow status\n";
+    exit(162);
 }
 
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr std::optional<ReferenceMutable<T>> BorrowChecker<T>::mut_optional() noexcept {
-    if (_immutable_count.value() != 0) return std::nullopt;
-    return ReferenceMutable<T>::create(_value, _mutable_lock);
+    switch (_tracker.register_mutable()) {
+    case internal::ReferenceTracker::MutableRegisterStatus::SUCCESS:
+        return std::make_optional<ReferenceMutable<T>>(_value, _tracker);
+    case internal::ReferenceTracker::MutableRegisterStatus::MUTABLE_EXISTS: {
+        // TODO: Use some LOG_DEBUG()
+#ifndef NDEBUG
+        std::cerr << "Attempt to borrow a second mutable reference" << std::endl;
+#endif
+        return std::nullopt;
+    }
+    case internal::ReferenceTracker::MutableRegisterStatus::IMMUTABLE_EXISTS: {
+        // TODO: Use some LOG_DEBUG()
+#ifndef NDEBUG
+        std::cerr << "Attempt to borrow a mutable reference when already borrowed an immutable one" << std::endl;
+#endif
+        return std::nullopt;
+    }
+    }
+    std::cerr << "Unknown mutable borrow status\n";
+    exit(162);
 }
 
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr ReferenceImmutable<T> BorrowChecker<T>::immut() {
-    if (_mutable_lock.locked())
+    if (!_tracker.register_immutable())
         throw std::runtime_error("Attempt to borrow an immutable reference when already borrowed a mutable one");
-    return ReferenceImmutable<T>(_value, _immutable_count);
+    return ReferenceImmutable(_value, _tracker);
 }
 
 template <typename T>
     requires(!std::is_reference_v<T>)
 constexpr std::optional<ReferenceImmutable<T>> BorrowChecker<T>::immut_optional() noexcept {
-    // BUG: Non-atomic
-    if (_mutable_lock.locked()) return std::nullopt;
-    return ReferenceImmutable<T>(_value, _immutable_count);
+    if (!_tracker.register_immutable()) return std::nullopt;
+    return std::make_optional<ReferenceImmutable<T>>(_value, _tracker);
 }
 
 template <typename T>

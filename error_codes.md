@@ -5,3 +5,4 @@ Below is the list of error codes used.
 |------|:------------------------------|
 | 160  | Dangling reference            |
 | 161  | Double release of a reference |
+| 162  | Internal implementation error |

@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 
 # Add executable files
 add_library(safecpp STATIC
-        lib/ReferenceLock.cpp
-        lib/ReferenceCounter.cpp
+        lib/ReferenceTracker.cpp
 )
 target_include_directories(safecpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
