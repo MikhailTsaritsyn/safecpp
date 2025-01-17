@@ -2,31 +2,36 @@
 // Created by Mikhail Tsaritsyn on Jan 16, 2025.
 //
 
-#ifndef SAFE_REFERENCE_GUARD_HPP
-#define SAFE_REFERENCE_GUARD_HPP
+#ifndef SAFE_ARC_HPP
+#define SAFE_ARC_HPP
 #include <mutex>
 
 namespace safe::internal {
 /**
- * @brief Class keeping track of all reference borrow events
+ * @brief Atomic reference counter
  *
- * The rules for registering/unregistering references are listed in @link BorrowChecker @endlink
+ * Counts the number of shared mutable and immutable references.
+ * At any point of time there can exist:
+ * - EITHER one read-write (mutable) reference
+ * - OR any number of read-only (immutable) references
+ *
+ * But not both at once.
  */
-class ReferenceTracker {
+class ARC {
 public:
     enum struct MutableRegisterStatus { SUCCESS, MUTABLE_EXISTS, IMMUTABLE_EXISTS };
 
-    ReferenceTracker() noexcept = default;
+    ARC() noexcept = default;
 
-    ReferenceTracker(const ReferenceTracker &) noexcept            = delete;
-    ReferenceTracker &operator=(const ReferenceTracker &) noexcept = delete;
-    ReferenceTracker(ReferenceTracker &&) noexcept                 = delete;
-    ReferenceTracker &operator=(ReferenceTracker &&) noexcept      = delete;
+    ARC(const ARC &) noexcept            = delete;
+    ARC &operator=(const ARC &) noexcept = delete;
+    ARC(ARC &&) noexcept                 = delete;
+    ARC &operator=(ARC &&) noexcept      = delete;
 
     /**
      * @note Terminates execution with code 161 if there are registered references remaining
      */
-    ~ReferenceTracker() noexcept;
+    ~ARC() noexcept;
 
     /**
      * @brief Register that a mutable reference has been borrowed
@@ -85,4 +90,4 @@ private:
 
 } // namespace safe::internal
 
-#endif // SAFE_REFERENCE_GUARD_HPP
+#endif // SAFE_ARC_HPP

@@ -4,7 +4,7 @@
 
 #ifndef SAFE_REFERENCE_IMMUTABLE_HPP
 #define SAFE_REFERENCE_IMMUTABLE_HPP
-#include "internal/ReferenceTracker.hpp"
+#include "internal/ARC.hpp"
 #include <concepts>
 #include <iostream>
 
@@ -16,12 +16,12 @@ namespace safe {
  */
 template <typename T>
     requires(!std::is_reference_v<T>)
-class ReferenceImmutable {
+class ImmutRef {
 public:
-    ReferenceImmutable() = delete;
+    ImmutRef() = delete;
 
-    ReferenceImmutable(const ReferenceImmutable &other) noexcept : _ref(other._ref), _tracker(other._tracker) {
-        if (_tracker && !_tracker->register_immutable()) {
+    ImmutRef(const ImmutRef &other) noexcept : _ref(other._ref), _arc(other._arc) {
+        if (_arc && !_arc->register_immutable()) {
             // Since an existing immutable reference is copied, it means that there can be no mutable references.
             // Therefore, nothing can prevent registering another immutable reference.
             // If it happens, it can only mean a bug in the implementation of this library, not in the used code.
@@ -30,22 +30,20 @@ public:
         }
     }
 
-    ReferenceImmutable &operator=(const ReferenceImmutable &) noexcept = delete;
+    ImmutRef &operator=(const ImmutRef &) noexcept = delete;
 
-    ReferenceImmutable(ReferenceImmutable &&other) noexcept : _ref(other._ref), _tracker(other._tracker) {
-        other._tracker = nullptr;
-    }
+    ImmutRef(ImmutRef &&other) noexcept : _ref(other._ref), _arc(other._arc) { other._arc = nullptr; }
 
-    ReferenceImmutable &operator=(ReferenceImmutable &&other) noexcept = delete;
+    ImmutRef &operator=(ImmutRef &&other) noexcept = delete;
 
-    ~ReferenceImmutable() noexcept {
-        if (_tracker && !_tracker->unregister_immutable()) {
+    ~ImmutRef() noexcept {
+        if (_arc && !_arc->unregister_immutable()) {
             std::cerr << "Double release of an immutable reference" << std::endl;
             exit(161);
         }
     }
 
-    ReferenceImmutable(T &ref, internal::ReferenceTracker &tracker) noexcept : _ref(ref), _tracker(&tracker) {}
+    ImmutRef(T &ref, internal::ARC &tracker) noexcept : _ref(ref), _arc(&tracker) {}
 
     /**
      * @brief Get access to the underlying reference
@@ -58,8 +56,8 @@ public:
     [[nodiscard]] constexpr const T *operator->() const noexcept { return &_ref; }
 
 private:
-    const T &_ref; /// Reference to the tracked object
-    internal::ReferenceTracker *_tracker;
+    const T &_ref;       ///< Reference to the tracked object
+    internal::ARC *_arc; ///< Counter shared among all references to the object
 };
 } // namespace safe
 

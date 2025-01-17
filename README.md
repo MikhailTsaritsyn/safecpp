@@ -3,7 +3,7 @@
 Implementing Rust-inspired mechanisms for memory- and thread-safety described
 in [this blog post](https://safecpp.org/P3390R0.html#the-call-for-memory-safety).
 
-# Borrow checker
+# Access Manager
 
 A reference-counting mechanism is implemented based on the following rules:
 
@@ -11,7 +11,7 @@ A reference-counting mechanism is implemented based on the following rules:
 2. There can be only one mutable reference to the object
 3. But not both at once
 
-`BorrowChecker` class provides APIs for mutable and immutable reference borrowing.
+`AccessManager` class provides APIs for mutable and immutable reference borrowing.
 Each of those has three options:
 
 1. **Failing**. If the attempt violates the rules, `null` is returned instead of the actual reference.
@@ -25,4 +25,4 @@ Each option has its own desired usage:
 2. **Throwing** is for the context where the user can ensure that the rules aren't violated.
 3. **Waiting** is for synchronization in multithreaded environment.
 
-Examples of those can be found in `test/BorrowChecker.cpp`.
+Examples of those can be found in `test/AccessManager.cpp`.
